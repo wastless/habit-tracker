@@ -8,6 +8,7 @@ import com.example.habittracker.data.database.Habit;
 import com.example.habittracker.data.database.HabitDao;
 import com.example.habittracker.data.database.HabitLog;
 import com.example.habittracker.data.database.HabitLogDao;
+import com.example.habittracker.firebase.FirebaseSyncManager;
 
 import java.util.Date;
 import java.util.List;
@@ -18,12 +19,18 @@ public class HabitRepository {
     private final HabitDao habitDao;
     private final HabitLogDao habitLogDao;
     private final ExecutorService executorService;
+    private final FirebaseSyncManager firebaseSyncManager;
+    private final boolean syncEnabled;
 
     public HabitRepository(Context context) {
         AppDatabase db = AppDatabase.getInstance(context);
         habitDao = db.habitDao();
         habitLogDao = db.habitLogDao();
         executorService = Executors.newFixedThreadPool(4);
+        
+        // Инициализация Firebase Sync Manager
+        firebaseSyncManager = FirebaseSyncManager.getInstance();
+        syncEnabled = true; // Можно сделать настройку в приложении
     }
 
     // Habit operations
@@ -31,6 +38,12 @@ public class HabitRepository {
         executorService.execute(() -> {
             long id = habitDao.insert(habit);
             habit.setId(id);
+            
+            // Синхронизация с Firebase
+            if (syncEnabled) {
+                firebaseSyncManager.uploadHabitToFirebase(habit);
+            }
+            
             if (listener != null) {
                 listener.onHabitInserted(habit);
             }
@@ -38,7 +51,14 @@ public class HabitRepository {
     }
 
     public void updateHabit(Habit habit) {
-        executorService.execute(() -> habitDao.update(habit));
+        executorService.execute(() -> {
+            habitDao.update(habit);
+            
+            // Синхронизация с Firebase
+            if (syncEnabled) {
+                firebaseSyncManager.uploadHabitToFirebase(habit);
+            }
+        });
     }
 
     public void deleteHabit(Habit habit) {
@@ -61,11 +81,25 @@ public class HabitRepository {
 
     // HabitLog operations
     public void insertHabitLog(HabitLog habitLog) {
-        executorService.execute(() -> habitLogDao.insert(habitLog));
+        executorService.execute(() -> {
+            habitLogDao.insert(habitLog);
+            
+            // Синхронизация с Firebase
+            if (syncEnabled) {
+                firebaseSyncManager.uploadHabitLogToFirebase(habitLog);
+            }
+        });
     }
 
     public void updateHabitLog(HabitLog habitLog) {
-        executorService.execute(() -> habitLogDao.update(habitLog));
+        executorService.execute(() -> {
+            habitLogDao.update(habitLog);
+            
+            // Синхронизация с Firebase
+            if (syncEnabled) {
+                firebaseSyncManager.uploadHabitLogToFirebase(habitLog);
+            }
+        });
     }
 
     public void deleteHabitLog(HabitLog habitLog) {
@@ -97,10 +131,22 @@ public class HabitRepository {
                 habitLogDao.update(log);
             }
             
+            // Синхронизация с Firebase
+            if (syncEnabled) {
+                firebaseSyncManager.syncHabitCompletion(log);
+            }
+            
             if (listener != null) {
                 listener.onHabitLogUpdated(log);
             }
         });
+    }
+    
+    // Запуск синхронизации с Firebase
+    public void syncWithFirebase() {
+        if (syncEnabled) {
+            firebaseSyncManager.syncData();
+        }
     }
 
     // Callback interfaces
