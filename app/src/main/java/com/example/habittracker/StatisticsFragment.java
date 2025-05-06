@@ -75,7 +75,22 @@ public class StatisticsFragment extends Fragment {
             
             final int count = completedCount;
             requireActivity().runOnUiThread(() -> {
-                completionCount.setText(String.format("Completed %d times", count));
+                String text;
+                if (count == 0) {
+                    text = "Не выполнялось";
+                } else {
+                    // Правильное склонение для русского языка
+                    String ending;
+                    if (count % 10 == 1 && count % 100 != 11) {
+                        ending = "раз";
+                    } else if (count % 10 >= 2 && count % 10 <= 4 && (count % 100 < 10 || count % 100 >= 20)) {
+                        ending = "раза";
+                    } else {
+                        ending = "раз";
+                    }
+                    text = String.format("Выполнено %d %s", count, ending);
+                }
+                completionCount.setText(text);
             });
         });
         
